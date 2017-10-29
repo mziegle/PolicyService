@@ -30,6 +30,7 @@ public class PolicyServiceServer {
     private CustomerServiceGrpc.CustomerServiceBlockingStub customerServiceBlockingStub = null;
     private DatabaseLoader databaseLoader = null;
 
+
     /**
      * Construct a new policy service server
      */
@@ -82,6 +83,8 @@ public class PolicyServiceServer {
                     @Override
                     public void streamPoliciesByValidityDateBetween(Period request, StreamObserver<Policy> responseObserver) {
 
+                        System.out.println(Thread.currentThread().getName());
+
                         final Date from = new Date(request.getFrom());
                         final Date to = new Date(request.getTo());
 
@@ -98,6 +101,8 @@ public class PolicyServiceServer {
 
                     @Override
                     public void getPolicyById(PolicyId request, StreamObserver<Policy> responseObserver) {
+
+                        System.out.println(Thread.currentThread().getName());
 
                         final Policy.Builder policy = databaseLoader.getPolicyById(request.getId());
                         policy.setCustomer(customerServiceBlockingStub.getCustomerById(Id.newBuilder().setId(policy.getCustomer().getId()).build()));

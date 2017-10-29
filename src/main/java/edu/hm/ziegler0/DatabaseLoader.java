@@ -1,7 +1,10 @@
 package edu.hm.ziegler0;
+import com.mysql.jdbc.jdbc2.optional.MysqlConnectionPoolDataSource;
 import io.grpc.partnerservice.Customer;
 import io.grpc.policyservice.Policy;
+import org.apache.commons.dbcp2.BasicDataSource;
 
+import javax.naming.InitialContext;
 import java.io.Closeable;
 import java.io.IOException;
 import java.sql.*;
@@ -24,7 +27,7 @@ public class DatabaseLoader implements Closeable {
     public static final String DB_USER = "DB_USER";
     public static final String DB_PASSWORD = "DB_PASSWORD";
 
-    private Connection connection;
+    private BasicDataSource dataSource;
 
     /**
      * Initializes the class DatabaseLoader. Tries to read the environment variables needed.
@@ -69,9 +72,7 @@ public class DatabaseLoader implements Closeable {
             allEnvironmentVariablesFound = false;
         }
 
-        // Now we can connect to database
-        if(allEnvironmentVariablesFound)
-            connect(db_server,db_name,db_user,db_password);
+        connect(db_server,db_name,db_user,db_password);
 
         return  allEnvironmentVariablesFound;
     }
@@ -80,16 +81,18 @@ public class DatabaseLoader implements Closeable {
      * Establish a connection to the database
      */
     private void connect(final String db_server,final String db_name,final String db_user,final String db_password) {
-        try {
 
-            connection = DriverManager.getConnection(
-                    "jdbc:mysql://" +
-                            db_server + "/"
-                            + db_name +
-                            "?autoReconnect=true" +
-                            "&useSSL=false",
-                    db_user,
-                    db_password);
+        try {
+            dataSource = new BasicDataSource();
+            String url = "jdbc:mysql://" +
+                    db_server + "/"
+                    + db_name + "?autoReconnect=true" +
+                    "&useSSL=false";
+            dataSource.setDriver(DriverManager.getDriver(url));
+
+            dataSource.setUsername(db_user);
+            dataSource.setPassword(db_password);
+            dataSource.setUrl(url);
 
         } catch (SQLException e) {
             System.err.println("Establishing a connection to the database has failed");
@@ -103,53 +106,60 @@ public class DatabaseLoader implements Closeable {
      * @param to
      * @return
      */
-    public List<Policy.Builder> getPoliciesByValidityDateBetween(final Date from, final Date to){
+    public List<Policy.Builder> getPoliciesByValidityDateBetween(final Date from, final Date to) {
 
         List<Policy.Builder> policies = new ArrayList<>();
 
-        try(PreparedStatement preparedStatement = connection.prepareStatement(SQL_POLICY_VALIDITY_DATE_BETWEEN)) {
+        try (Connection connection = dataSource.getConnection()) {
 
-            LocalDate ldFrom = Instant.ofEpochMilli(from.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
-            LocalDate ldTo = Instant.ofEpochMilli(from.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
+            try(PreparedStatement preparedStatement = connection.prepareStatement(SQL_POLICY_VALIDITY_DATE_BETWEEN)) {
 
-            preparedStatement.setDate(1, java.sql.Date.valueOf(ldFrom));
-            preparedStatement.setDate(2, java.sql.Date.valueOf(ldTo));
+                LocalDate ldFrom = Instant.ofEpochMilli(from.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
+                LocalDate ldTo = Instant.ofEpochMilli(from.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
 
-            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                preparedStatement.setDate(1, java.sql.Date.valueOf(ldFrom));
+                preparedStatement.setDate(2, java.sql.Date.valueOf(ldTo));
 
-                int lastPolicyId = -1;
-                Policy.Builder policy = null;
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
 
-                while (resultSet.next()) {
+                    int lastPolicyId = -1;
+                    Policy.Builder policy = null;
 
-                    int policyId = resultSet.getInt("policy.id");
-                    if(policyId != lastPolicyId){
-                        policy = Policy.newBuilder();
+                    while (resultSet.next()) {
+
+                        int policyId = resultSet.getInt("policy.id");
+                        if(policyId != lastPolicyId){
+                            policy = Policy.newBuilder();
+                        }
+
+                        policy
+                                .setId(policyId)
+                                .setCustomer(Customer.newBuilder().setId(resultSet.getInt("policy.customer_id")))
+                                .setValidityDate(resultSet.getDate("policy.validity_date").getTime())
+                                .setTerritorialScope(resultSet.getString("policy.territorial_scope"))
+                                .setInsurer(resultSet.getString("policy.insurer"));
+
+                        policy.addContractsBuilder()
+                                .setId(resultSet.getInt("contract.id"))
+                                .setType(resultSet.getString("contract.type"))
+                                .setAmountInsured(resultSet.getDouble("contract.amount_insured"))
+                                .setCompletionDate(resultSet.getDate("contract.completion_date").getTime())
+                                .setExpirationDate(resultSet.getDate("contract.expiration_date").getTime())
+                                .setAnnualSubscription(resultSet.getDouble("contract.annual_subscription")).build();
+
+                        policies.add(policy);
+                        lastPolicyId = policyId;
+
                     }
-
-                    policy
-                            .setId(policyId)
-                            .setCustomer(Customer.newBuilder().setId(resultSet.getInt("policy.customer_id")))
-                            .setValidityDate(resultSet.getDate("policy.validity_date").getTime())
-                            .setTerritorialScope(resultSet.getString("policy.territorial_scope"))
-                            .setInsurer(resultSet.getString("policy.insurer"));
-
-                    policy.addContractsBuilder()
-                            .setId(resultSet.getInt("contract.id"))
-                            .setType(resultSet.getString("contract.type"))
-                            .setAmountInsured(resultSet.getDouble("contract.amount_insured"))
-                            .setCompletionDate(resultSet.getDate("contract.completion_date").getTime())
-                            .setExpirationDate(resultSet.getDate("contract.expiration_date").getTime())
-                            .setAnnualSubscription(resultSet.getDouble("contract.annual_subscription")).build();
-
-                    policies.add(policy);
-                    lastPolicyId = policyId;
-
                 }
+
+            } catch (SQLException e) {
+                System.err.println("executing query failed: " + SQL_POLICY_VALIDITY_DATE_BETWEEN);
+                e.printStackTrace();
             }
 
         } catch (SQLException e) {
-            System.err.println("executing query failed: " + SQL_POLICY_VALIDITY_DATE_BETWEEN);
+            System.err.println("Establishing a connection to the database has failed");
             e.printStackTrace();
         }
 
@@ -157,7 +167,6 @@ public class DatabaseLoader implements Closeable {
     }
 
     /**
-     *
      * get Policy by id
      *
      * @param id
@@ -166,38 +175,44 @@ public class DatabaseLoader implements Closeable {
     public Policy.Builder getPolicyById(int id) {
 
         Policy.Builder policyToFill = Policy.newBuilder();
-        policyToFill.setId(id);
 
-        try (PreparedStatement preparedStatement = connection.prepareStatement(SQL_POLICY_BY_ID)) {
+        try (Connection connection = dataSource.getConnection()) {
 
-            preparedStatement.setInt(1, policyToFill.getId());
+            policyToFill.setId(id);
 
-            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+            try (PreparedStatement preparedStatement = connection.prepareStatement(SQL_POLICY_BY_ID)) {
 
-                while (resultSet.next()) {
+                preparedStatement.setInt(1, policyToFill.getId());
 
-                    policyToFill
-                            .setId(resultSet.getInt("policy.id"))
-                            .setCustomer(Customer.newBuilder().setId(resultSet.getInt("policy.customer_id")))
-                            .setValidityDate(resultSet.getDate("policy.validity_date").getTime())
-                            .setTerritorialScope(resultSet.getString("policy.territorial_scope"))
-                            .setInsurer(resultSet.getString("policy.insurer"));
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
 
-                    policyToFill.addContractsBuilder()
-                            .setId(resultSet.getInt("contract.id"))
-                            .setType(resultSet.getString("contract.type"))
-                            .setAmountInsured(resultSet.getDouble("contract.amount_insured"))
-                            .setCompletionDate(resultSet.getDate("contract.completion_date").getTime())
-                            .setExpirationDate(resultSet.getDate("contract.expiration_date").getTime())
-                            .setAnnualSubscription(resultSet.getDouble("contract.annual_subscription")).build();
+                    while (resultSet.next()) {
+
+                        policyToFill
+                                .setId(resultSet.getInt("policy.id"))
+                                .setCustomer(Customer.newBuilder().setId(resultSet.getInt("policy.customer_id")))
+                                .setValidityDate(resultSet.getDate("policy.validity_date").getTime())
+                                .setTerritorialScope(resultSet.getString("policy.territorial_scope"))
+                                .setInsurer(resultSet.getString("policy.insurer"));
+
+                        policyToFill.addContractsBuilder()
+                                .setId(resultSet.getInt("contract.id"))
+                                .setType(resultSet.getString("contract.type"))
+                                .setAmountInsured(resultSet.getDouble("contract.amount_insured"))
+                                .setCompletionDate(resultSet.getDate("contract.completion_date").getTime())
+                                .setExpirationDate(resultSet.getDate("contract.expiration_date").getTime())
+                                .setAnnualSubscription(resultSet.getDouble("contract.annual_subscription")).build();
+                    }
                 }
+
+            } catch (SQLException e) {
+                System.err.println("executing query failed: " + SQL_POLICY_BY_ID);
+                e.printStackTrace();
             }
 
         } catch (SQLException e) {
-
-            System.err.println("executing query failed: " + SQL_POLICY_BY_ID);
+            System.err.println("Establishing a connection to the database has failed");
             e.printStackTrace();
-
         }
 
         return policyToFill;
@@ -206,7 +221,7 @@ public class DatabaseLoader implements Closeable {
     @Override
     public void close() throws IOException {
         try {
-            connection.close();
+            dataSource.close();
         } catch (SQLException e) {
             System.err.println("Closing the connection to the database has failed");
             e.printStackTrace();
