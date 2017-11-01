@@ -28,7 +28,7 @@ public class PolicyServiceServer {
     private int policyServicePort;
 
     private CustomerServiceGrpc.CustomerServiceBlockingStub customerServiceBlockingStub = null;
-    private DatabaseLoader databaseLoader = null;
+    private PolicyDataSource policyDataSource = null;
 
 
     /**
@@ -65,9 +65,9 @@ public class PolicyServiceServer {
                         .forAddress(customerServiceHost, customerServicePort)
                         .usePlaintext(true)
                         .build());
-        databaseLoader = new DatabaseLoader();
-        databaseLoader.initialize();
 
+        policyDataSource = new PolicyDataSource();
+        policyDataSource.initialize();
     }
 
     /**
@@ -88,7 +88,7 @@ public class PolicyServiceServer {
                         final Date from = new Date(request.getFrom());
                         final Date to = new Date(request.getTo());
 
-                        final List<Policy.Builder> policies = databaseLoader.getPoliciesByValidityDateBetween(from, to);
+                        final List<Policy.Builder> policies = policyDataSource.getPoliciesByValidityDateBetween(from, to);
 
                         for (Policy.Builder policy : policies) {
                             policy.setCustomer(customerServiceBlockingStub.getCustomerById(
@@ -104,7 +104,7 @@ public class PolicyServiceServer {
 
                         System.out.println(Thread.currentThread().getName());
 
-                        final Policy.Builder policy = databaseLoader.getPolicyById(request.getId());
+                        final Policy.Builder policy = policyDataSource.getPolicyById(request.getId());
                         policy.setCustomer(customerServiceBlockingStub.getCustomerById(Id.newBuilder().setId(policy.getCustomer().getId()).build()));
 
                         responseObserver.onNext(policy.build());
@@ -132,8 +132,9 @@ public class PolicyServiceServer {
     private void stop() {
         if (server != null) {
             try {
-                databaseLoader.close();
+                policyDataSource.close();
             } catch (IOException e) {
+                System.err.println("Failed to close the connection pool");
                 e.printStackTrace();
             }
             server.shutdown();
