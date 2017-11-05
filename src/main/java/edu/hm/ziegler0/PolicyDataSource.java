@@ -49,7 +49,7 @@ public class PolicyDataSource implements Closeable {
             allEnvironmentVariablesFound = false;
         }
 
-        if(environmentVariables.containsKey(DB_SERVER)){
+        if(environmentVariables.containsKey(DB_NAME)){
             db_name = environmentVariables.get(DB_NAME);
         } else {
             System.out.printf("did not find property for database name");

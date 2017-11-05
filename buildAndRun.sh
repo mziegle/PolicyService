@@ -8,7 +8,7 @@ rm -rf run/target
 
 docker cp policy_service_build:/build/target run
 
-docker build --rm -t policy_service:run run
+docker build --rm -t mziegle1/policy_service:run run
 
 docker rm -f policy_service_build
 
@@ -25,4 +25,4 @@ docker run \
     -e CUSTOMER_SERVICE_PORT=50031 \
     -e CUSTOMER_SERVICE_HOST=docker.for.mac.localhost \
     -i -t --security-opt=seccomp:unconfined \
-    --rm policy_service:run
+    --rm mziegle1/policy_service:run
