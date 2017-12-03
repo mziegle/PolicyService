@@ -8,11 +8,8 @@ import io.grpc.policyservice.Policy;
 import io.grpc.policyservice.PolicyId;
 import io.grpc.policyservice.PolicyServiceGrpc;
 
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 

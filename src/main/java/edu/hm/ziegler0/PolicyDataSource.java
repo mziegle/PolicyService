@@ -14,10 +14,12 @@ import java.util.Date;
 
 public class PolicyDataSource implements Closeable {
 
-    public static final String SQL_POLICY_BY_ID = "select * from policy inner join contract on " +
-                                                    "policy.id = contract.policy_id where policy.id = ?";
+    public static final String SQL_POLICY_BY_ID =
+            "select * from policy inner join contract on " +
+                    "policy.id = contract.policy_id where policy.id = ?";
 
-    public static final String SQL_POLICY_VALIDITY_DATE_BETWEEN = "select * from policy inner join contract on " +
+    public static final String SQL_POLICY_VALIDITY_DATE_BETWEEN =
+            "select * from policy inner join contract on " +
             "policy.id = contract.policy_id where policy.validity_date between ? and ?";
 
     public static final String DB_SERVER = "DB_SERVER";
