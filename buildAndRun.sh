@@ -21,8 +21,8 @@ docker run \
     -e DB_USER=user \
     -e DB_PASSWORD=user \
     -e DB_NAME=insurance_policy \
-    -e POLICY_SERVICE_PORT=50032 \
-    -e CUSTOMER_SERVICE_PORT=50031 \
+    -e POLICY_SERVICE_PORT=40001 \
+    -e CUSTOMER_SERVICE_PORT=40000 \
     -e CUSTOMER_SERVICE_HOST=docker.for.mac.localhost \
     -i -t --security-opt=seccomp:unconfined \
     --rm mziegle1/policy_service:run

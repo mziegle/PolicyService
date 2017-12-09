@@ -13,6 +13,7 @@ import io.grpc.stub.StreamObserver;
 
 import java.io.IOException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +31,12 @@ public class PolicyServiceServer {
     private CustomerServiceGrpc.CustomerServiceBlockingStub customerServiceBlockingStub = null;
     private PolicyDataSource policyDataSource = null;
 
+    private static final Map<String,String> DEFAULT_VARIABLES = new HashMap<>();
+    static {
+        DEFAULT_VARIABLES.put(CUSTOMER_SERVICE_HOST,"localhost");
+        DEFAULT_VARIABLES.put(CUSTOMER_SERVICE_PORT,"40000");
+        DEFAULT_VARIABLES.put(POLICY_SERVICE_PORT,"40001");
+    }
 
     /**
      * Construct a new policy service server
@@ -37,27 +44,36 @@ public class PolicyServiceServer {
     PolicyServiceServer() {
 
         Map<String, String> environmentVariables = System.getenv();
-
+        boolean envNotFound = false;
 
         if (environmentVariables.containsKey(POLICY_SERVICE_PORT)) {
             policyServicePort = Integer.parseInt(environmentVariables.get(POLICY_SERVICE_PORT));
         } else {
             System.out.printf("did not find property for policy service port");
-            return;
+            envNotFound = true;
         }
 
         if (environmentVariables.containsKey(CUSTOMER_SERVICE_HOST)) {
             customerServiceHost = environmentVariables.get(CUSTOMER_SERVICE_HOST);
         } else {
             System.out.printf("did not find property for policy service host");
-            return;
+            envNotFound = true;
         }
 
         if (environmentVariables.containsKey(CUSTOMER_SERVICE_PORT)) {
             customerServicePort = Integer.parseInt(environmentVariables.get(CUSTOMER_SERVICE_PORT));
         } else {
             System.out.printf("did not find property for customer service port");
-            return;
+            envNotFound = true;
+        }
+
+        if(envNotFound) {
+
+            System.out.println("Okay, using default hosts and ports now.");
+            customerServiceHost = DEFAULT_VARIABLES.get(CUSTOMER_SERVICE_HOST);
+            customerServicePort = Integer.parseInt(DEFAULT_VARIABLES.get(CUSTOMER_SERVICE_PORT));
+            policyServicePort = Integer.parseInt(DEFAULT_VARIABLES.get(POLICY_SERVICE_PORT));
+
         }
 
         customerServiceBlockingStub = CustomerServiceGrpc
@@ -110,6 +126,7 @@ public class PolicyServiceServer {
                         responseObserver.onNext(policy.build());
                         responseObserver.onCompleted();
                     }
+
                 })
                 .build()
                 .start();
