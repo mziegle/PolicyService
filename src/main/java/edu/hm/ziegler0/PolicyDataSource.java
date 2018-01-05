@@ -101,7 +101,7 @@ public class PolicyDataSource implements Closeable {
     }
 
     /**
-     *
+     * Finds Policies which validity date lies in the given period.
      * @param from
      * @param to
      * @return
@@ -221,6 +221,10 @@ public class PolicyDataSource implements Closeable {
         return policyToFill;
     }
 
+    /**
+     * Close connection to datasource
+     * @throws IOException
+     */
     @Override
     public void close() throws IOException {
         try {

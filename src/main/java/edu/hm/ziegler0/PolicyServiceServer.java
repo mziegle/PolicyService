@@ -146,6 +146,9 @@ public class PolicyServiceServer {
         });
     }
 
+    /**
+     * Stops the grpc server
+     */
     private void stop() {
         if (server != null) {
             try {
